@@ -99,8 +99,8 @@ DEFAULT_MODIFIERS = {
 DEFAULT_MODIFIERS = dict((tuple(OPCODES[opcode] for opcode in opcodes),
                          dict(((tuple(MODES[a] for a in ab_modes[0]),
                                 tuple(MODES[b] for b in ab_modes[1])),
-                               MODIFIERS[modifier]) for ab_modes, modifier in ab_modes_modifiers.iteritems()))
-                         for opcodes, ab_modes_modifiers in DEFAULT_MODIFIERS.iteritems())
+                               MODIFIERS[modifier]) for ab_modes, modifier in ab_modes_modifiers.items()))
+                         for opcodes, ab_modes_modifiers in DEFAULT_MODIFIERS.items())
 
 class Warrior(object):
     "An encapsulation of a Redcode Warrior, with instructions and meta-data"
@@ -157,9 +157,9 @@ class Instruction(object):
         return instruction
 
     def default_modifier(self):
-        for opcodes, modes_modifiers in DEFAULT_MODIFIERS.iteritems():
+        for opcodes, modes_modifiers in DEFAULT_MODIFIERS.items():
             if self.opcode in opcodes:
-                for ab_modes, modifier in modes_modifiers.iteritems():
+                for ab_modes, modifier in modes_modifiers.items():
                     a_modes, b_modes = ab_modes
                     if self.a_mode in a_modes and self.b_mode in b_modes:
                         return modifier
@@ -191,10 +191,10 @@ class Instruction(object):
 
     def __str__(self):
         # inverse lookup the instruction values
-        opcode   = next(key for key,value in OPCODES.iteritems() if value==self.opcode)
-        modifier = next(key for key,value in MODIFIERS.iteritems() if value==self.modifier)
-        a_mode   = next(key for key,value in MODES.iteritems() if value==self.a_mode)
-        b_mode   = next(key for key,value in MODES.iteritems() if value==self.b_mode)
+        opcode   = next(key for key,value in OPCODES.items() if value==self.opcode)
+        modifier = next(key for key,value in MODIFIERS.items() if value==self.modifier)
+        a_mode   = next(key for key,value in MODES.items() if value==self.a_mode)
+        b_mode   = next(key for key,value in MODES.items() if value==self.b_mode)
 
         return "%s.%s %s %s, %s %s" % (opcode,
                                        modifier.ljust(2),
@@ -353,7 +353,7 @@ def parse(input, definitions={}):
 
         # create a dictionary of relative labels addresses to be used as a local
         # eval environment
-        relative_labels = dict((name, address-n) for name, address in labels.iteritems())
+        relative_labels = dict((name, address-n) for name, address in labels.items())
 
         # evaluate instruction fields using global environment and labels
         if isinstance(instruction.a_number, str):

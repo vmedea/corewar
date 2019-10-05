@@ -92,7 +92,7 @@ class PygameMARS(MARS):
     def __init__(self, *args, **kargs):
         super(PygameMARS, self).__init__(*args, **kargs)
         self.size = (INSTRUCTION_SIZE_X * INSTRUCTIONS_PER_LINE,
-                     INSTRUCTION_SIZE_Y * (len(self) / INSTRUCTIONS_PER_LINE))
+                     int(INSTRUCTION_SIZE_Y * (len(self) / INSTRUCTIONS_PER_LINE)))
         self.core_surface = pygame.Surface(self.size)
         self.recent_events = pygame.Surface(self.size)
         self.recent_events.set_colorkey(DEFAULT_BG_COLOR)
@@ -182,13 +182,13 @@ if __name__ == "__main__":
                         default=100, help='Max warrior length')
     parser.add_argument('--distance', '-d', metavar='MINDISTANCE', type=int, nargs='?',
                         default=100, help='Minimum warrior distance')
-    parser.add_argument('warriors', metavar='WARRIOR', type=file, nargs='+',
+    parser.add_argument('warriors', metavar='WARRIOR', type=argparse.FileType('r'), nargs='+',
                         help='Warrior redcode filename')
 
     args = parser.parse_args()
 
     if len(args.warriors) > len(WARRIOR_COLORS):
-        print >> sys.stderr, "Please specify a maximum of %d warriors." % len(WARRIOR_COLORS)
+        print("Please specify a maximum of %d warriors." % len(WARRIOR_COLORS), file=sys.stderr)
         sys.exit(1)
 
     # build environment
@@ -236,7 +236,7 @@ if __name__ == "__main__":
     clock = pygame.time.Clock()
 
     # for each round
-    for round in xrange(1, args.rounds + 1):
+    for round in range(1, args.rounds + 1):
 
         # reset simulation and load warriors
         simulation.reset()
@@ -254,10 +254,10 @@ if __name__ == "__main__":
         # control variable
         next_round = False
 
-        print
-        print "Starting round %d" % round
+        print()
+        print("Starting round %d" % round)
 
-        for cycle in xrange(args.cycles):
+        for cycle in range(args.cycles):
             # step one simulation in MARS
             simulation.step()
 
@@ -265,13 +265,13 @@ if __name__ == "__main__":
             mouse_pos = pygame.mouse.get_pos()
             # calculate address based on mouse position if position is over core
             if 0 <= mouse_pos[0] <= simulation.size[0] and 0 <= mouse_pos[1] <= simulation.size[1]:
-                c_address = (INSTRUCTIONS_PER_LINE * (mouse_pos[1]/INSTRUCTION_SIZE_Y) +
-                             (mouse_pos[0] / INSTRUCTION_SIZE_X))
+                c_address = int(INSTRUCTIONS_PER_LINE * (mouse_pos[1]/INSTRUCTION_SIZE_Y) +
+                             int(mouse_pos[0] / INSTRUCTION_SIZE_X))
 
             # clear display part of instructions
             display_surface.fill(BLACK, ((simulation.size[0], 0),
                                          (ZOOM_VIEW_WIDTH, simulation.size[1])))
-            for n, address in enumerate(xrange(c_address-18, c_address+18)):
+            for n, address in enumerate(range(c_address-18, c_address+18)):
                 instruction = simulation[address]
                 i_surface = core_font.render("%04d %s" % (address,
                                                           instruction),
@@ -291,9 +291,9 @@ if __name__ == "__main__":
             to_remove = []
             for warrior in active_warriors:
                 if not warrior.task_queue:
-                    print "%s (%s) losses after %d cycles." % (warrior.name,
+                    print("%s (%s) losses after %d cycles." % (warrior.name,
                                                                warrior.author,
-                                                               cycle)
+                                                               cycle))
                     warrior.losses += 1
                     to_remove.append(warrior)
 
@@ -303,9 +303,9 @@ if __name__ == "__main__":
             # if there's only one left, or are all dead, then stop simulation
             if len(active_warriors) <= active_warrior_to_stop:
                 for warrior in active_warriors:
-                    print "%s (%s) wins after %d cycles." % (warrior.name,
+                    print("%s (%s) wins after %d cycles." % (warrior.name,
                                                              warrior.author,
-                                                             cycle)
+                                                             cycle))
                     warrior.wins += 1
                 break
 
@@ -335,33 +335,33 @@ if __name__ == "__main__":
             if next_round:
                 for warrior in active_warriors:
                     if warrior.task_queue:
-                        print "%s (%s) ties after %d cycles." % (warrior.name,
+                        print("%s (%s) ties after %d cycles." % (warrior.name,
                                                                  warrior.author,
-                                                                 cycle)
+                                                                 cycle))
                         warrior.ties += 1
                 break
         else:
             # running until max cycles: tie
             for warrior in active_warriors:
                 if warrior.task_queue:
-                    print "%s (%s) ties after %d cycles." % (warrior.name,
+                    print("%s (%s) ties after %d cycles." % (warrior.name,
                                                              warrior.author,
-                                                             cycle)
+                                                             cycle))
                     warrior.ties += 1
 
         if stop_rounds:
             break
 
     # print final results
-    print
-    print "Final results: (%d rounds)" % round
-    print "%s %s %s %s" % ("Warrior (Author)".ljust(40), "wins".rjust(5),
-                           "ties".rjust(5), "losses".rjust(5))
+    print()
+    print("Final results: (%d rounds)" % round)
+    print("%s %s %s %s" % ("Warrior (Author)".ljust(40), "wins".rjust(5),
+                           "ties".rjust(5), "losses".rjust(5)))
     for warrior in warriors:
-        print "%s %s %s %s" % (("%s (%s)" % (warrior.name, warrior.author)).ljust(40),
+        print("%s %s %s %s" % (("%s (%s)" % (warrior.name, warrior.author)).ljust(40),
                                str(warrior.wins).rjust(5),
                                str(warrior.ties).rjust(5),
-                               str(warrior.losses).rjust(5))
+                               str(warrior.losses).rjust(5)))
 
     if not stop_rounds and not next_round:
         # keeps display open, until quit

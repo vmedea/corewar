@@ -62,7 +62,7 @@ class MARS(object):
             # position is in the nth equally separated space plus a random
             # shift up to where the last instruction is minimum separated from
             # the first instruction of the next warrior
-            warrior_position = (n * space)
+            warrior_position = int(n * space)
 
             if randomize:
                 warrior_position += randint(0, max(0, space -
@@ -407,7 +407,7 @@ class MARS(object):
 
 if __name__ == "__main__":
     import argparse
-    import redcode
+    from . import redcode
 
     parser = argparse.ArgumentParser(description='MARS (Memory Array Redcode Simulator)')
     parser.add_argument('--rounds', '-r', metavar='ROUNDS', type=int, nargs='?',
@@ -443,7 +443,7 @@ if __name__ == "__main__":
         warrior.wins = warrior.ties = warrior.losses = 0
 
     # for each round
-    for i in xrange(args.rounds):
+    for i in range(args.rounds):
 
         # create new simulation
         simulation = MARS(warriors=warriors,
@@ -452,7 +452,7 @@ if __name__ == "__main__":
 
         active_warrior_to_stop = 1 if len(warriors) >= 2 else 0
 
-        for c in xrange(args.cycles):
+        for c in range(args.cycles):
             simulation.step()
 
             # if there's only one left, or are all dead, then stop simulation
@@ -472,13 +472,13 @@ if __name__ == "__main__":
                     warrior.losses += 1
 
     # print results
-    print "Results: (%d rounds)" % args.rounds
-    print "%s %s %s %s" % ("Warrior (Author)".ljust(40), "wins".rjust(5),
-                           "ties".rjust(5), "losses".rjust(5))
+    print("Results: (%d rounds)" % args.rounds)
+    print("%s %s %s %s" % ("Warrior (Author)".ljust(40), "wins".rjust(5),
+                           "ties".rjust(5), "losses".rjust(5)))
     for warrior in warriors:
-        print "%s %s %s %s" % (("%s (%s)" % (warrior.name, warrior.author)).ljust(40),
+        print("%s %s %s %s" % (("%s (%s)" % (warrior.name, warrior.author)).ljust(40),
                                str(warrior.wins).rjust(5),
                                str(warrior.ties).rjust(5),
-                               str(warrior.losses).rjust(5))
+                               str(warrior.losses).rjust(5)))
 
 

@@ -1,6 +1,5 @@
 # coding: utf-8
 
-from copy import copy
 from redcode import Instruction
 
 __all__ = ['DEFAULT_INITIAL_INSTRUCTION', 'Core']
@@ -22,7 +21,7 @@ class Core(object):
     def clear(self, instruction=DEFAULT_INITIAL_INSTRUCTION):
         """Writes the same instruction thorough the entire core.
         """
-        self.instructions = [instruction.core_binded(self) for i in xrange(self.size)]
+        self.instructions = [instruction.core_binded(self) for i in range(self.size)]
 
     def trim_write(self, address):
         "Return the trimmed address to write, considering the write limit."
