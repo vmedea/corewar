@@ -123,6 +123,12 @@ class Warrior(object):
 
     def __repr__(self):
         return "<Warrior name=%s %d instructions>" % (self.name, len(self.instructions))
+    
+    def decompile(self):
+        code = ';redcode\n' + 'ORG %d' % self.start + '\n'
+        for instruction in self.instructions:
+            code = code + str(instruction) + '\n'
+        return code
 
 class Instruction(object):
     "An encapsulation of a Redcode instruction."

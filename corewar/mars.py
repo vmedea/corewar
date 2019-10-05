@@ -422,6 +422,8 @@ if __name__ == "__main__":
                         default=100, help='Max warrior length')
     parser.add_argument('--distance', '-d', metavar='MINDISTANCE', type=int, nargs='?',
                         default=100, help='Minimum warrior distance')
+    parser.add_argument('--assembled', '-a', metavar='ASSEMBLED', nargs='?',
+                        default=False, help='Print assembled programs')
     parser.add_argument('warriors', metavar='WARRIOR', type=argparse.FileType('r'), nargs='+',
                         help='Warrior redcode filename')
 
@@ -437,6 +439,10 @@ if __name__ == "__main__":
 
     # assemble warriors
     warriors = [redcode.parse(file, environment) for file in args.warriors]
+    
+    if args.assembled:
+        for warrior in warriors:
+            print(warrior.decompile())
 
     # initialize wins, losses and ties for each warrior
     for warrior in warriors:
