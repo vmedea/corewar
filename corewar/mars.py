@@ -405,6 +405,41 @@ class MARS(object):
                 else:
                     raise ValueError("Invalid opcode: %d" % ir.opcode)
 
+def run_match(warriors, environment):
+    # initialize wins, losses and ties for each warrior
+    for warrior in warriors:
+        warrior.wins = warrior.ties = warrior.losses = 0
+
+    # for each round
+    for i in range(environment['ROUNDS']):
+
+        # create new simulation
+        simulation = MARS(warriors=warriors,
+                          minimum_separation = environment['MINDISTANCE'],
+                          max_processes = environment['MAXPROCESSES'])
+
+        active_warrior_to_stop = 1 if len(warriors) >= 2 else 0
+
+        for c in range(environment['CYCLES']):
+            simulation.step()
+
+            # if there's only one left, or are all dead, then stop simulation
+            if sum(1 if warrior.task_queue else 0 for warrior in warriors) <= active_warrior_to_stop:
+                for warrior in warriors:
+                    if warrior.task_queue:
+                        warrior.wins += 1
+                    else:
+                        warrior.losses += 1
+                break
+        else:
+            # running until max cycles: tie
+            for warrior in warriors:
+                if warrior.task_queue:
+                    warrior.ties += 1
+                else:
+                    warrior.losses += 1
+
+
 if __name__ == "__main__":
     import argparse
     import redcode
@@ -444,38 +479,7 @@ if __name__ == "__main__":
         for warrior in warriors:
             print(warrior.decompile())
 
-    # initialize wins, losses and ties for each warrior
-    for warrior in warriors:
-        warrior.wins = warrior.ties = warrior.losses = 0
-
-    # for each round
-    for i in range(args.rounds):
-
-        # create new simulation
-        simulation = MARS(warriors=warriors,
-                          minimum_separation = args.distance,
-                          max_processes = args.processes)
-
-        active_warrior_to_stop = 1 if len(warriors) >= 2 else 0
-
-        for c in range(args.cycles):
-            simulation.step()
-
-            # if there's only one left, or are all dead, then stop simulation
-            if sum(1 if warrior.task_queue else 0 for warrior in warriors) <= active_warrior_to_stop:
-                for warrior in warriors:
-                    if warrior.task_queue:
-                        warrior.wins += 1
-                    else:
-                        warrior.losses += 1
-                break
-        else:
-            # running until max cycles: tie
-            for warrior in warriors:
-                if warrior.task_queue:
-                    warrior.ties += 1
-                else:
-                    warrior.losses += 1
+    run_match(warriors, environment)
 
     # print results
     print("Results: (%d rounds)" % args.rounds)
