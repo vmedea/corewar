@@ -407,7 +407,7 @@ class MARS(object):
 
 if __name__ == "__main__":
     import argparse
-    from . import redcode
+    import redcode
 
     parser = argparse.ArgumentParser(description='MARS (Memory Array Redcode Simulator)')
     parser.add_argument('--rounds', '-r', metavar='ROUNDS', type=int, nargs='?',
@@ -422,7 +422,7 @@ if __name__ == "__main__":
                         default=100, help='Max warrior length')
     parser.add_argument('--distance', '-d', metavar='MINDISTANCE', type=int, nargs='?',
                         default=100, help='Minimum warrior distance')
-    parser.add_argument('warriors', metavar='WARRIOR', type=file, nargs='+',
+    parser.add_argument('warriors', metavar='WARRIOR', type=argparse.FileType('r'), nargs='+',
                         help='Warrior redcode filename')
 
     args = parser.parse_args()
