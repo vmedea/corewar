@@ -72,6 +72,10 @@ OPCODES = {'DAT': DAT, 'MOV': MOV, 'ADD': ADD, 'SUB': SUB, 'MUL': MUL,
            'DJN': DJN, 'SPL': SPL, 'SLT': SLT, 'CMP': CMP, 'SEQ': SEQ,
            'SNE': SNE, 'NOP': NOP}
 
+reserved_words = {'DAT', 'MOV', 'ADD', 'SUB', 'MUL', 'DIV', 'MOD', 'JMP',
+                  'JMZ', 'JMN', 'DJN', 'SPL', 'SLT', 'CMP', 'SEQ', 'SNE',
+                  'NOP', 'FOR', 'ROF', 'ORG', 'END'}
+
 MODIFIERS = {'A': M_A, 'B': M_B, 'AB': M_AB, 'BA': M_BA, 'F': M_F, 'X': M_X,
              'I': M_I}
 
@@ -83,16 +87,16 @@ MODES = { '#': IMMEDIATE, '$': DIRECT, '@': INDIRECT_B, '<': PREDEC_B,
 # table below.
 #        Opcode                             A-mode    B-mode    modifier
 DEFAULT_MODIFIERS = {
-        ('DAT', 'NOP')                 : {('#$@<>', '#$@<>'): 'F'},
-        ('MOV','CMP')                  : {('#'    , '#$@<>'): 'AB',
+        ('DAT', 'NOP')                 : {('#$@<>{}', '#$@<>{}'): 'F'},
+        ('MOV','CMP')                  : {('#'     , '#$@<>'): 'AB',
                                           ('$@<>' , '#'    ): 'B' ,
-                                          ('$@<>' , '$@<>' ): 'I'},
+                                          ('$@<>*{}' , '$@<>*{}' ): 'I'},
         ('ADD','SUB','MUL','DIV','MOD'): {('#'    , '#$@<>'): 'AB',
                                           ('$@<>' , '#'    ): 'B' ,
-                                          ('$@<>' , '$@<>' ): 'F'},
+                                          ('$@<>' , '$@<>*{}' ): 'F'},
         ('SLT', 'SEQ', 'SNE')          : {('#'    , '#$@<>'): 'AB',
                                           ('$@<>' , '#$@<>'): 'B'},
-        ('JMP','JMZ','JMN','DJN','SPL'): {('#$@<>', '#$@<>'): 'B'}
+        ('JMP','JMZ','JMN','DJN','SPL'): {('#$@<>{}', '#$@<>{}'): 'B'}
     }
 
 # Transform the readable form above, into the internal representation
@@ -106,14 +110,14 @@ class Warrior(object):
     "An encapsulation of a Redcode Warrior, with instructions and meta-data"
 
     def __init__(self, name='Unnamed', author='Anonymous', date=None,
-                 version=None, strategy=None, start=0):
+                 version=None, strategy=None, start=0, instructions=[]):
         self.name = name
         self.author = author
         self.date = date
         self.version = version
         self.strategy = strategy
         self.start = start
-        self.instructions = []
+        self.instructions = instructions
 
     def __iter__(self):
         return iter(self.instructions)
@@ -169,7 +173,8 @@ class Instruction(object):
                     a_modes, b_modes = ab_modes
                     if self.a_mode in a_modes and self.b_mode in b_modes:
                         return modifier
-        raise RuntimeError("Error getting default modifier")
+        raise ValueError(
+            "Error getting default modifier for opcode %s with A mode %s and B mode %s" % (self.opcode, self.a_mode, self.b_mode))
 
     @property
     def a_number(self):
@@ -212,160 +217,270 @@ class Instruction(object):
     def __repr__(self):
         return "<%s>" % self
 
-def parse(input, definitions={}):
-    """ Parse a Redcode code from a line iterator (input) returning a Warrior
-        object."""
+# Context and management class for parsing a warrior's code
+class Parser(object):
+    # A bunch of global regexes
+    blank_line_m = re.compile(r'^\s*$')
+    start_comment_m = re.compile(r'^;.+$')
+    inline_comment_m = re.compile(r'^([^;]*)\s*;')
+    redcode_m = re.compile(r'^;redcode\w*$', re.I)
+    name_m = re.compile(r'^;name\s+(.+)$', re.I)
+    author_m = re.compile(r'^;author\s+(.+)$', re.I)
+    date_m = re.compile(r'^;date\s+(.+)$', re.I)
+    version_m = re.compile(r'^;version\s+(.+)$', re.I)
+    strategy_m = re.compile(r'^;strat(?:egy)?\s+(.+)$', re.I)
+    assert_m = re.compile(r'^;assert\s+(.+)$', re.I)
+    c_and_m = re.compile(r'(&&)')
+    c_or_m = re.compile(r'(\|\|)')
+    equ_m = re.compile(r'^(\w+)\s+EQU\s+(.+)\s*$', re.I)
+    label_m = re.compile(r'^(\w+)(.*)$')
+    for_m = re.compile(r'^FOR(?:\s+([^\s]+))?$', re.I)
+    rof_m = re.compile(r'^ROF\s*$', re.I)
+    leading_zeroes_m = re.compile(r'^0+(\d+)$')
+    
+    def __init__(self, environment, equ_defs = {}):
+        # use a clone of environment because we're going to add names to it
+        self.environment = copy(environment)
+        # Loose strategy notes - will be concatenated later
+        self.strategy = []
+        self.processing_complete = False
+        self.processing_started = False
+        self.instructions = []
+        self.labels = {}
+        self.equ_defs = equ_defs
+        
+        self.start = 0
+        self.name='Unnamed'
+        self.author='Anonymous'
+    
+    def process_directives(self, line, line_num):
+        m = Parser.redcode_m.match(line)
+        if m:
+            if self.processing_started:
+                # stop reading, found second ;redcode
+                self.processing_complete = True
+            else:
+                # first ;redcode, so start doing stuff
+                self.processing_started = True
+            return
 
-    found_recode_info_comment = False
-    labels = {}
-    code_address = 0
+        m = Parser.name_m.match(line)
+        if m:
+            self.name = m.group(1).strip()
+            return
 
-    warrior = Warrior()
-    warrior.strategy = []
+        m = Parser.author_m.match(line)
+        if m:
+            self.author = m.group(1).strip()
+            return
 
-    # use a version of environment because we're going to add names to it
-    environment = copy(definitions)
+        m = Parser.date_m.match(line)
+        if m:
+            self.date = m.group(1).strip()
+            return
 
-    # first pass
-    for n, line in enumerate(input):
-        line = line.strip()
-        if line:
+        m = Parser.version_m.match(line)
+        if m:
+            self.version = m.group(1).strip()
+            return
+
+        m = Parser.strategy_m.match(line)
+        if m:
+            self.strategy.append(m.group(1).strip())
+            return
+
+        # Test if assert expression evaluates to true
+        m = Parser.assert_m.match(line)
+        if m:
+            assertion = m.group(1)
+            assertion = Parser.c_and_m.sub(' and ', assertion)
+            assertion = Parser.c_or_m.sub(' or ', assertion)
+            if not eval(assertion, self.environment):
+                raise AssertionError("Assertion failed: %s, line %d" % (line, line_num))
+            return
+
+    def strip_ignored(self, line):
+        # ignore comments
+        m = Parser.start_comment_m.match(line)
+        if m:
+            # strip comment from the line
+            line = m.group(1)
+        return line.strip()
+
+    def process_labels(self, line):
+        # Keep matching the first word until it's no label anymore
+        # TODO: handle labels on lines which do not have code
+        #print(line)
+        while True:
+            m = Parser.label_m.match(line)
+            if m:
+                label_candidate = m.group(1)
+                #print('label candidate: %s' % label_candidate)
+                if label_candidate.upper() not in reserved_words:
+                    self.labels[label_candidate] = len(self.instructions)
+                    #print('line %d' % self.labels[label_candidate])
+
+                    # strip label off and keep looking
+                    line = m.group(2)
+                    continue
+            # its an instruction, not label. proceed OR no match, probably
+            # a all-value-omitted instruction.
+            return line.strip()
+
+    def process_equ(self, line):
+        # Match EQU defines
+        m = Parser.equ_m.match(line)
+        if m:
+            name, value = m.groups()
+            # Some competitors like to use forward declarations or labels
+            # in their EQU statements, so we're going to need to save
+            # definitions we can't evaluate until later.
+            # Evaluate all the ones we can, in the meantime.
+            try:
+                self.environment[name] = eval(value, self.environment)
+                #print('%s: %d' % (name, self.environment[name]))
+            except (SyntaxError, NameError) as err:
+                #print('Could not evaluate rewrite rule: %s' % line)
+                self.equ_defs[name] = value
+            return True
+        else:
+            return False
+
+    def extract_instruction(self, line, line_num):
+        # Finally, look for instructions
+        m = INSTRUCTION_REGEX.match(line)
+        if not m:
+            raise ValueError('Error at line %d: expected instruction in expression: "%s"' %
+                             (line_num, line))
+        else:
+            opcode, modifier, a_mode, a_number, b_mode, b_number = m.groups()
+
+            if opcode.upper() not in OPCODES:
+                raise ValueError('Invalid opcode: %s in line %d: "%s"' %
+                                 (opcode, line_num, line))
+            if modifier is not None and modifier.upper() not in MODIFIERS:
+                raise ValueError('Invalid modifier: %s in line %d: "%s"' %
+                                 (modifier, line_num, line))
+
+            # add parts of instruction read. the fields should be parsed
+            # as an expression in the second pass, to expand labels
+            self.instructions.append(Instruction(opcode, modifier,
+                                                    a_mode, a_number,
+                                                    b_mode, b_number))
+
+    def parse(self, code):
+        in_for_loop = False
+        # first pass
+        for n, line in enumerate(code):
             # process info comments
-            m = re.match(r'^;redcode\w*$', line, re.I)
-            if m:
-                if found_recode_info_comment:
-                    # stop reading, found second ;redcode
-                    break;
-                else:
-                    # first ;redcode ignore all input before
-                    warrior.instructions = []
-                    labels = {}
-                    environment = copy(definitions)
-                    code_address = 0
-                    found_recode_info_comment = True
+            if Parser.start_comment_m.match(line):
+                self.process_directives(line, n)
+                if self.processing_complete:
+                    return
                 continue
 
-            m = re.match(r'^;name\s+(.+)$', line, re.I)
-            if m:
-                warrior.name = m.group(1).strip()
-                continue
-
-            m = re.match(r'^;author\s+(.+)$', line, re.I)
-            if m:
-                warrior.author = m.group(1).strip()
-                continue
-
-            m = re.match(r'^;date\s+(.+)$', line, re.I)
-            if m:
-                warrior.date = m.group(1).strip()
-                continue
-
-            m = re.match(r'^;version\s+(.+)$', line, re.I)
-            if m:
-                warrior.version = m.group(1).strip()
-                continue
-
-            m = re.match(r'^;strat(?:egy)?\s+(.+)$', line, re.I)
-            if m:
-                warrior.strategy.append(m.group(1).strip())
-                continue
-
-            # Test if assert expression evaluates to true
-            m = re.match(r'^;assert\s+(.+)$', line, re.I)
-            if m:
-                if not eval(m.group(1), environment):
-                    raise AssertionError("Assertion failed: %s, line %d" % (line, n))
-                continue
-
+            #print(line)
+            #line = self.strip_ignored(line)
             # ignore other comments
             m = re.match(r'^([^;]*)\s*;', line)
             if m:
-                # rip off comment from the line
-                line = m.group(1).strip()
-                # if this is a comment line
-                if not line: continue
+                # strip comment from the line
+                line = m.group(1)
+            line = line.strip()
+            
+            if Parser.blank_line_m.match(line):
+                continue
 
             # Match ORG
             m = re.match(r'^ORG\s+(.+)\s*$', line, re.I)
             if m:
-                warrior.start = m.group(1)
+                self.start = m.group(1)
                 continue
 
             # Match END
             m = re.match(r'^END(?:\s+([^\s]+))?$', line, re.I)
             if m:
                 if m.group(1):
-                    warrior.start = m.group(1)
-                break # stop processing (end of redcode)
+                    self.start = m.group(1)
+                return # stop processing (end of redcode)
 
-            # Match EQU
-            m = re.match(r'^([a-z]\w*)\s+EQU\s+(.*)\s*$', line, re.I)
-            if m:
-                name, value = m.groups()
-                # evaluate EQU expression using previous EQU definitions,
-                # add result to a name variable in environment
-                environment[name] = eval(value, environment)
+            if self.process_equ(line):
                 continue
 
-            # Keep matching the first word until it's no label anymore
-            while True:
-                m = re.match(r'^([a-z]\w*)\s+(.+)\s*$', line)
+            #TODO: This has a loop with a boundary condition, which we want to change.
+            line = self.process_labels(line)
+            
+            # Match FOR pseudo-opcode
+            # "for" is a PITA to implement when iterating over lines like this.
+            # Lots of human code uses it, though, so we have to do it.
+            m = Parser.for_m.match(line)
+            if m:
+                if m.group(1):
+                    #print('entering for expansion')
+                    for_copy_expression = m.group(1)
+                    in_for_loop = True
+                    for_loop_lines = []
+                    continue
+
+            if in_for_loop:
+                m = Parser.rof_m.match(line)
                 if m:
-                    label_candidate = m.group(1)
-                    if label_candidate.upper() not in OPCODES:
-                        labels[label_candidate] = code_address
+                    #print('end of for expansion')
+                    sub_parser = Parser(self.environment, equ_defs=self.equ_defs)
+                    sub_parser.parse(for_loop_lines)
+                    ops = sub_parser.instructions
+                    expand_count = eval(for_copy_expression, self.environment, {'CURLINE': len(self.instructions)})
+                    #print('expanding for loop %d times' % expand_count)
+                    self.instructions.extend(ops * expand_count)
+                    in_for_loop = False
+                else:
+                    for_loop_lines.append(line)
+                continue
+            
+            if len(line) > 0:
+                self.extract_instruction(line, n)
 
-                        # strip label off and keep looking
-                        line = m.group(2)
-                        continue
-                # its an instruction, not label. proceed OR no match, probably
-                # a all-value-omitted instruction.
-                break
+        # evaluate start expression
+        if isinstance(self.start, str):
+            self.start = eval(self.start, self.environment, self.labels)
 
-            # At last, it should match an instruction
-            m = INSTRUCTION_REGEX.match(line)
-            if not m:
-                raise ValueError('Error at line %d: expected instruction in expression: "%s"' %
-                                 (n, line))
-            else:
-                opcode, modifier, a_mode, a_number, b_mode, b_number = m.groups()
+        # second pass
+        for n, instruction in enumerate(self.instructions):
+            try:
+                # create a dictionary of relative labels addresses to be used as a local
+                # eval environment
+                relative_labels = dict((name, address-n) for name, address in self.labels.items())
+                relative_labels['CURLINE'] = n
+                # Expand EQU statements which use labels
+                for identifier, rule in self.equ_defs.items():
+                    relative_labels[identifier] = eval(rule, self.environment, relative_labels)
 
-                if opcode.upper() not in OPCODES:
-                    raise ValueError('Invalid opcode: %s in line %d: "%s"' %
-                                     (opcode, n, line))
-                if modifier is not None and modifier.upper() not in MODIFIERS:
-                    raise ValueError('Invalid modifier: %s in line %d: "%s"' %
-                                     (modifier, n, line))
+                # evaluate instruction fields using global environment and labels
+                if isinstance(instruction.a_number, str):
+                    instruction.a_number = self.canonicalize(instruction.a_number, relative_labels)
+                if isinstance(instruction.b_number, str):
+                    instruction.b_number = self.canonicalize(instruction.b_number, relative_labels)
+            except (SyntaxError, NameError) as err:
+                print(err)
+                raise ValueError('Error while evaluating instruction %s' % instruction)
+    
+    # This function exists because some clowns prefix zeroes onto their numbers.
+    def canonicalize(self, expression, relative_labels):
+        m = Parser.leading_zeroes_m.match(expression)
+        if m:
+            return int(m.group(1))
+        else:
+            return eval(expression, self.environment, relative_labels)
 
-                # add parts of instruction read. the fields should be parsed
-                # as an expression in the second pass, to expand labels
-                warrior.instructions.append(Instruction(opcode, modifier,
-                                                        a_mode, a_number,
-                                                        b_mode, b_number))
+    def create_warrior(self):
+        #TODO: is stub
+        start = self.start
+        if isinstance(start, str):
+            start = eval(start, self.environment, self.labels)
 
-            # increment code counting
-            code_address += 1
+        return Warrior(name=self.name, author=self.author, strategy='\n'.join(self.strategy), start=start, instructions=self.instructions)
 
-
-    # join strategy lines with line breaks
-    warrior.strategy = '\n'.join(warrior.strategy)
-
-    # evaluate start expression
-    if isinstance(warrior.start, str):
-        warrior.start = eval(warrior.start, environment, labels)
-
-    # second pass
-    for n, instruction in enumerate(warrior.instructions):
-
-        # create a dictionary of relative labels addresses to be used as a local
-        # eval environment
-        relative_labels = dict((name, address-n) for name, address in labels.items())
-
-        # evaluate instruction fields using global environment and labels
-        if isinstance(instruction.a_number, str):
-            instruction.a_number = eval(instruction.a_number, environment, relative_labels)
-        if isinstance(instruction.b_number, str):
-            instruction.b_number = eval(instruction.b_number, environment, relative_labels)
-
-    return warrior
-
+def parse(input, env={}):
+    parser = Parser(env)
+    parser.parse(input)
+    return parser.create_warrior()
