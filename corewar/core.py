@@ -1,6 +1,6 @@
 # coding: utf-8
 
-from redcode import Instruction
+from corewar.redcode import Instruction
 
 __all__ = ['DEFAULT_INITIAL_INSTRUCTION', 'Core']
 
@@ -47,6 +47,11 @@ class Core(object):
         return result
 
     def __getitem__(self, address):
+        # The zip() function in Python 2 returns an iterable list, where Python 3
+        # returns an iterator. Python 2 was able to make sense of 'address % self.size'
+        # when address is a slice (vs. int) but those needs to be specified for Python 3.
+        if (isinstance (address, slice)):
+            return [self.instructions[i % self.size] for i in range (address.start, address.stop + 1)]
         return self.instructions[address % self.size]
 
     def __getslice__(self, start, stop):

@@ -5,8 +5,8 @@ from copy import copy
 import operator
 from random import randint
 
-from core import Core, DEFAULT_INITIAL_INSTRUCTION
-from redcode import *
+from corewar.core import Core, DEFAULT_INITIAL_INSTRUCTION
+from corewar.redcode import *
 
 __all__ = ['MARS', 'EVENT_EXECUTED', 'EVENT_I_WRITE', 'EVENT_I_READ',
            'EVENT_A_DEC', 'EVENT_A_INC', 'EVENT_B_DEC', 'EVENT_B_INC',
