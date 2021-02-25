@@ -182,7 +182,7 @@ if __name__ == "__main__":
                         default=100, help='Max warrior length')
     parser.add_argument('--distance', '-d', metavar='MINDISTANCE', type=int, nargs='?',
                         default=100, help='Minimum warrior distance')
-    parser.add_argument('warriors', metavar='WARRIOR', type=argparse.FileType('r'), nargs='+',
+    parser.add_argument('warriors', metavar='WARRIOR', type=argparse.FileType('r', errors='surrogateescape'), nargs='+',
                         help='Warrior redcode filename')
 
     args = parser.parse_args()

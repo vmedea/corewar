@@ -459,7 +459,7 @@ if __name__ == "__main__":
                         default=100, help='Minimum warrior distance')
     parser.add_argument('--assembled', '-a', metavar='ASSEMBLED', nargs='?',
                         default=False, help='Print assembled programs')
-    parser.add_argument('warriors', metavar='WARRIOR', type=argparse.FileType('r'), nargs='+',
+    parser.add_argument('warriors', metavar='WARRIOR', type=argparse.FileType('r', errors='surrogateescape'), nargs='+',
                         help='Warrior redcode filename')
 
     args = parser.parse_args()
