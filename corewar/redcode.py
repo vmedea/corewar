@@ -377,7 +377,7 @@ class Parser(object):
             if Parser.start_comment_m.match(line):
                 self.process_directives(line, n)
                 if self.processing_complete:
-                    return
+                    break
                 continue
 
             #print(line)
@@ -402,7 +402,7 @@ class Parser(object):
             if m:
                 if m.group(1):
                     self.start = m.group(1)
-                return # stop processing (end of redcode)
+                break # stop processing (end of redcode)
 
             if self.process_equ(line):
                 continue
