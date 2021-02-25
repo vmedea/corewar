@@ -4,9 +4,9 @@
 import pygame
 from pygame.locals import *
 
-from core import DEFAULT_INITIAL_INSTRUCTION
-from mars import *
-from redcode import *
+from corewar.core import DEFAULT_INITIAL_INSTRUCTION
+from corewar.mars import *
+from corewar.redcode import *
 
 INSTRUCTIONS_PER_LINE = 100
 INSTRUCTION_SIZE_X = 9
