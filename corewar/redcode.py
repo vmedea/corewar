@@ -472,13 +472,37 @@ class Parser(object):
         else:
             return eval(expression, self.environment, relative_labels)
 
+    def guess_enc(self, text):
+        '''
+        Guess character set from surrogate-encoded unicode text.
+        '''
+        try:
+            text.encode('utf-8')
+        except UnicodeEncodeError:
+            # 'utf-8' codec can't encode character '\uXXXX' in position x: surrogates not allowed
+            # Guess latin-1 as this is the common text encoding for warriors
+            self.encoding = 'latin-1'
+        else:
+            self.encoding = 'utf-8'
+
+    def fixup_enc(self, text):
+        '''
+        Fix up encoding based on detected character set (return the result as unicode string).
+        '''
+        if self.encoding != 'utf-8':
+            return text.encode('utf-8', errors='surrogateescape').decode(self.encoding)
+        else:
+            return text
+
     def create_warrior(self):
         #TODO: is stub
         start = self.start
         if isinstance(start, str):
             start = eval(start, self.environment, self.labels)
 
-        return Warrior(name=self.name, author=self.author, strategy='\n'.join(self.strategy), start=start, instructions=self.instructions)
+        self.guess_enc(self.name + '\n' + self.author + '\n' + ('\n'.join(self.strategy)))
+
+        return Warrior(name=self.fixup_enc(self.name), author=self.fixup_enc(self.author), strategy=self.fixup_enc('\n'.join(self.strategy)), start=start, instructions=self.instructions)
 
 def parse(input, env={}):
     parser = Parser(env)
