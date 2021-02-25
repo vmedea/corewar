@@ -44,8 +44,8 @@ class TestMars(unittest.TestCase):
         else:
             self.fail("Running for too long and both warriors still alive")
 
-        self.assertEquals(1, len(dwarf.task_queue))
-        self.assertEquals(0, len(sitting_duck.task_queue))
+        self.assertEqual(1, len(dwarf.task_queue))
+        self.assertEqual(0, len(sitting_duck.task_queue))
 
     def test_validate(self):
 
