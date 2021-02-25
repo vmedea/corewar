@@ -372,6 +372,7 @@ class Parser(object):
         in_for_loop = False
         # first pass
         for n, line in enumerate(code):
+            line = line.strip()
             # process info comments
             if Parser.start_comment_m.match(line):
                 self.process_directives(line, n)
@@ -386,7 +387,6 @@ class Parser(object):
             if m:
                 # strip comment from the line
                 line = m.group(1)
-            line = line.strip()
             
             if Parser.blank_line_m.match(line):
                 continue
