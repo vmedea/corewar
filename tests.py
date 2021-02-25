@@ -3,6 +3,7 @@
 
 import unittest
 
+import tests
 from tests.redcode_test import TestRedcodeAssembler
 from tests.mars_test import TestMars
 
